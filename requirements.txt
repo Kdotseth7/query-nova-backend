@@ -1,0 +1,15 @@
+SQLAlchemy
+fastapi
+fastapi-utils
+openai
+python-dotenv
+uvicorn
+pydantic
+pydantic-settings
+faiss-cpu
+numpy
+pandas
+alembic
+boto3
+requests
+python-multipart
