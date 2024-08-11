@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post("/users")
 async def create_user(user: UserRequest, db: AsyncSession = Depends(get_db)):

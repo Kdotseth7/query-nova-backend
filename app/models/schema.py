@@ -3,7 +3,8 @@ from typing import List, Any
 from datetime import datetime
 
 class QueryRequest(BaseModel):
-    text: str
+    user_id: str
+    query: str
 
 class QueryResponse(BaseModel):
     query: str

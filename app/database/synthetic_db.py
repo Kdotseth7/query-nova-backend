@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from core.config import settings
 import logging
 
-DATABASE_URL = f"postgresql+asyncpg://{settings.DATABASE_USER}:{settings.DATABASE_PASSWORD}@{settings.DATABASE_HOST}/{settings.DATABASE_NAME}"
+DATABASE_URL = f"postgresql+asyncpg://{settings.SYNTHETIC_DB_USER}:{settings.SYNTHETIC_DB_PASSWORD}@{settings.SYNTHETIC_DB_HOST}/{settings.SYNTHETIC_DB_NAME}"
 
 logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
 
@@ -26,6 +26,3 @@ async def get_db():
             yield session
         finally:
             await session.close()
-
-if __name__ == "__main__":
-    logging.info(DATABASE_URL)

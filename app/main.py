@@ -6,6 +6,17 @@ from database.models import Base
 import uvicorn
 import logging
 
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
 app = FastAPI()
 
 app.add_middleware(
@@ -24,7 +35,7 @@ async def root():
 async def healthcheck():
     return {"message": "Query Nova Agent is healthy!"}
 
-app.include_router(query.router, prefix="/api/v1")
+app.include_router(query.router)
 app.include_router(users.router)
 
 @app.on_event("startup")
@@ -45,4 +56,4 @@ async def shutdown_event():
     print("Shutting down...")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="debug")

@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     MAX_TOKENS: int = 150
     TEMPERATURE: float = 0.5
     
+    SYNTHETIC_DB_USER: str
+    SYNTHETIC_DB_PASSWORD: str
+    SYNTHETIC_DB_HOST: str
+    SYNTHETIC_DB_NAME: str
+    
     class Config:
         env_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
         env_file_encoding = 'utf-8'

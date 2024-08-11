@@ -1,5 +1,7 @@
 from core.config import settings
 import faiss
+import pandas as pd
+from sqlalchemy.orm import Session
 
 class Rag:
     def insert_embeddings(self, vectors):
@@ -10,7 +12,6 @@ class Rag:
     def similarity_search(self, query_vector, index, k=5):
         _, I = index.search(query_vector, k)
         return I
-
-    def create_embeddings(self, schema: str) -> str:
-        combined_desriptions = []
         
+    def filter_tables(self, query: str, schema_info: dict) -> list:
+        pass        
