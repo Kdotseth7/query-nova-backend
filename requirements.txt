@@ -13,3 +13,4 @@ alembic
 boto3
 requests
 python-multipart
+psycopg2

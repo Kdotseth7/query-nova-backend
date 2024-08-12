@@ -5,10 +5,8 @@ import logging
 
 DATABASE_URL = f"postgresql+asyncpg://{settings.DATABASE_USER}:{settings.DATABASE_PASSWORD}@{settings.DATABASE_HOST}/{settings.DATABASE_NAME}"
 
-logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
-
 # Create an async engine
-engine = create_async_engine(DATABASE_URL, echo=True, future=True)
+engine = create_async_engine(DATABASE_URL, future=True)
 
 # Create a configured "Session" class
 SessionLocal = sessionmaker(
