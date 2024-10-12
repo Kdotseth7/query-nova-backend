@@ -4,10 +4,23 @@ from service.rag import Rag
 from database.synthetic_db import get_db
 from sqlalchemy.orm import Session
 import logging
+import traceback
 import pandas as pd
+from typing import List
+from models.pydantic_models import LLM_Table_Filter, PydanticSqlQuery
+from utils.prompts import TABLE_FILTER_PROMPT, SQL_GENERATION_PROMPT
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages.chat import ChatMessage
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class QueryNova:
+    
+    openai_llm = OpenAILLM()
+    llm = openai_llm.initialize_gpt4()
+    
     def get_schema(self, db: Session) -> list:
         schema_info = []
 
@@ -62,19 +75,15 @@ class QueryNova:
             })
 
         return schema_info
-
     
-    def convert_text_to_sql(text: str, relevant_tables: list) -> str:
-        llm = OpenAILLM()
-        prompt = f"Using these tables {relevant_tables}, convert this text to SQL: {text}"
-        sql_query = llm.generate_sql(prompt)
-        return sql_query
-    
-    
-    def execute_query(sql_query: str) -> list:
-        with engine.connect() as connection:
-            result = connection.execute(sql_query)
-            return [dict(row) for row in result]
+    def execute_query(self, sql_query: str, db: Session) -> list:
+        engine = db.get_bind()
+        try:
+            df = pd.read_sql(sql_query, engine)
+            # logger.info(f"Query Results: {df}")
+            return df.to_dict(orient="records")
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
         
     def generate_table_descriptions(self, schema_info: list) -> list:
         table_descriptions = []
@@ -98,16 +107,49 @@ class QueryNova:
     
     
     def filter_tables_llm(self, query: str, schema_info: list) -> list:
-        openai_llm = OpenAILLM()
-        
         combined_schema = ""
         for table in schema_info:
             combined_schema += table + "\n"
-            
-        logging.info(f"Combined Schema: {combined_schema}")
+        # logger.info(f"Combined Schema: {combined_schema}")
         
-        filtered_tables = openai_llm.generate_response(query, combined_schema)
-
+        try:
+            prompt_messages = List = []
+            prompt_messages.append(ChatMessage(role="system", content=TABLE_FILTER_PROMPT))
+            prompt_messages.append(ChatMessage(role="user", content=f"Question: {query}"))
+            prompt = ChatPromptTemplate.from_messages(prompt_messages)
+            chain = prompt | self.llm.with_structured_output(LLM_Table_Filter)
+            response = chain.invoke({"tables_schema": combined_schema})
+            logger.info(f"LLM Table Filter Response with reasoning: {response}")
+            logger.info(f"Tables Filtered by LLM: {response.dict()}")
+            filtered_tables = [item['table_name'] for item in response.dict()["tables"]]
+            return filtered_tables
+        except Exception as e:
+            traceback_str = traceback.format_exc()
+            logger.error(f"Traceback: {traceback_str}")
+            return {"status": "error", "message": str(e)}
+        
+        
+    def generate_sql_query(self, query: str, filtered_tables: list, schema_info: list) -> str:
+        combined_schema = ""
+        for table in schema_info:
+            combined_schema += table + "\n"
+        # logger.info(f"Combined Schema: {combined_schema}")
+        
+        try:
+            prompt_messages = List = []
+            prompt_messages.append(ChatMessage(role="system", content=SQL_GENERATION_PROMPT))
+            prompt_messages.append(ChatMessage(role="user", content=f"Question: {query}"))
+            prompt = ChatPromptTemplate.from_messages(prompt_messages)
+            chain = prompt | self.llm.with_structured_output(PydanticSqlQuery)
+            response = chain.invoke({"tables_schema": combined_schema, "filtered_tables": filtered_tables})
+            logger.info(f"Generated SQL Query with reasoning: {response}")
+            sql_query = response.dict()["sql_query"]
+            return sql_query
+        except Exception as e:
+            traceback_str = traceback.format_exc()
+            logger.error(f"Traceback: {traceback_str}")
+            return {"status": "error", "message": str(e)}
+            
         
     def run(self, user_id: str, query: str) -> list:
         with get_db() as db:
@@ -116,14 +158,24 @@ class QueryNova:
             
         combined_descriptions = self.generate_table_descriptions(schema_info)
         
-        rag = Rag()
-        filtered_tables_rag, filtered_tables_schema_rag = rag.filter_tables(query, combined_descriptions)
-        logging.info(f"Tables Filtered by RAG: {filtered_tables_rag}")
+        try:
+            rag = Rag()
+            filtered_tables_rag, filtered_tables_schema_rag = rag.filter_tables(query, combined_descriptions)
+            logger.info(f"Tables Filtered by RAG: {filtered_tables_rag}")
+            
+            # Filter table using LLM by passing tables filtered by RAG with their schema info using Zero-shot Prompt
+            filtered_tables_llm = self.filter_tables_llm(query, filtered_tables_schema_rag)
+            
+            sql_query = self.generate_sql_query(query, filtered_tables_llm, filtered_tables_schema_rag)
+            
+            with get_db() as db:
+                df = self.execute_query(sql_query, db)
+                if len(df) == 0:
+                    return {"status": "error", "message": "No results found for the query."}
+                return df
         
-        # Filter table using LLM by passing tables filtered by RAG with their schema info using Zero-shot Prompt
-        filtered_tables_llm = self.filter_tables_llm(query, filtered_tables_schema_rag)
-        
-        # sql_query = self.convert_text_to_sql(self, query, filtered_tables)
-        # results = self.execute_query(sql_query)
-        return filtered_tables_rag
+        except Exception as e:
+            traceback_str = traceback.format_exc()
+            logger.error(f"Traceback: {traceback_str}")
+            return {"status": "error", "message": str(e)}
     
